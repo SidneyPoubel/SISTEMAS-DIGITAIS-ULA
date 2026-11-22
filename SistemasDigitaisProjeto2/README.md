@@ -1,64 +1,64 @@
-# Teclado PS/2 → LCD com Tradução Morse
+# PS/2 Keyboard → LCD with Morse Translation
 
-Projeto em VHDL para a placa **Xilinx Spartan-3AN** (clock de 50 MHz). Ele lê teclas de um teclado PS/2, mostra os caracteres digitados na **linha 1** de um LCD 16x2 (modo 4 bits) e exibe a tradução em código Morse na **linha 2**.
+VHDL project for the **Xilinx Spartan-3AN** board (50 MHz clock). It reads keys from a PS/2 keyboard, shows the typed characters on **line 1** of a 16x2 LCD (4-bit mode), and displays their Morse code translation on **line 2**.
 
-O número de caracteres é limitado a **5**.
+The text is limited to **5 characters**.
 
-## Arquivos
+## Files
 
-| Arquivo | Descrição |
+| File | Description |
 |---|---|
-| `teclado_morse_lcd.vhd` | Módulo principal (receptor PS/2, tradutor, controlador do LCD) |
-| `tb_teclado.vhd` | Testbench que simula um teclado PS/2 enviando teclas |
+| `teclado_morse_lcd.vhd` | Main module (PS/2 receiver, translator, LCD controller) |
+| `tb_teclado.vhd` | Testbench that emulates a PS/2 keyboard sending keys |
 
-## Como funciona
+## How it works
 
-O design é dividido em quatro blocos (processos):
+The design is split into four blocks (processes):
 
-1. **Receptor PS/2:** sincroniza o `ps2_clk` com o clock do sistema, detecta a borda de descida e desloca os bits de dados para um registrador de 11 bits (start + 8 dados + paridade + stop). Ao completar um quadro, gera um pulso `scan_ready` com o scan code de 8 bits.
-2. **Tradutor scan code → ASCII/Morse:** converte o scan code em ASCII e no padrão Morse correspondente, e guarda os dois em buffers. Trata o *break code* (`F0`, liberação de tecla) ignorando o scan code seguinte, e a tecla Backspace (`66`) apagando o último caractere e seus símbolos Morse.
-3. **Base de tempo do LCD:** gera o pulso `lcd_tick`, que dita o ritmo da máquina de estados do LCD.
-4. **Controlador do LCD (FSM):** inicializa o LCD em modo 4 bits e depois atualiza as duas linhas continuamente a partir dos buffers. Cada byte é enviado em 4 sub-passos (nibble alto com E em 1, E em 0, nibble baixo com E em 1, E em 0).
+1. **PS/2 receiver:** synchronizes `ps2_clk` to the system clock, detects its falling edge, and shifts the data bits into an 11-bit register (start + 8 data + parity + stop). When a frame is complete, it pulses `scan_ready` with the 8-bit scan code.
+2. **Scan code → ASCII/Morse translator:** converts the scan code to ASCII and to its Morse pattern, and stores both in buffers. It handles the *break code* (`F0`, key release) by ignoring the scan code that follows it, and handles Backspace (`66`) by erasing the last character and its Morse symbols.
+3. **LCD time base:** generates the `lcd_tick` pulse that paces the LCD state machine.
+4. **LCD controller (FSM):** initializes the LCD in 4-bit mode and then continuously refreshes both lines from the buffers. Each byte is sent in 4 sub-steps (high nibble with E high, E low, low nibble with E high, E low).
 
-### Formato do Morse
+### Morse format
 
-Cada letra ocupa `sym_len` posições no buffer: os símbolos (`.` e `-`) mais uma posição em branco como separador. Por exemplo, `A` (`.-`) usa 3 posições. A tecla de espaço usa 3 posições em branco.
+Each letter takes `sym_len` positions in the buffer: the symbols (`.` and `-`) plus one blank position as a separator. For example, `A` (`.-`) uses 3 positions. The space key uses 3 blank positions.
 
-O buffer Morse tem 16 posições e é exibido inteiro na linha 2.
+The Morse buffer has 16 positions, and all of them are shown on line 2.
 
 ## Interface
 
-| Porta | Direção | Descrição |
+| Port | Direction | Description |
 |---|---|---|
-| `clk` | entrada | Clock de 50 MHz |
-| `rst` | entrada | Reset síncrono, ativo em nível alto |
-| `ps2_clk` | entrada | Clock do teclado PS/2 |
-| `ps2_data` | entrada | Dados do teclado PS/2 |
-| `lcd_rs` | saída | Seleção de registrador (0 = comando, 1 = dado) |
-| `lcd_rw` | saída | Fixo em `'0'` (somente escrita) |
-| `lcd_e` | saída | Enable do LCD |
-| `lcd_data[3:0]` | saída | Barramento de dados de 4 bits (D7..D4) |
+| `clk` | in | 50 MHz clock |
+| `rst` | in | Synchronous reset, active high |
+| `ps2_clk` | in | PS/2 keyboard clock |
+| `ps2_data` | in | PS/2 keyboard data |
+| `lcd_rs` | out | Register select (0 = command, 1 = data) |
+| `lcd_rw` | out | Fixed at `'0'` (write only) |
+| `lcd_e` | out | LCD enable |
+| `lcd_data[3:0]` | out | 4-bit data bus (D7..D4) |
 
-Os pinos físicos devem ser definidos no arquivo de restrições (`.ucf`) conforme a sua placa e o seu LCD.
+Physical pins must be assigned in the constraints file (`.ucf`) according to your board and LCD wiring.
 
-## Teclas suportadas
+## Supported keys
 
-- Letras **A–Z** (scan codes do Set 2 do PS/2)
-- **Espaço**
-- **Backspace** (apaga o último caractere)
+- Letters **A–Z** (PS/2 Scan Code Set 2)
+- **Space**
+- **Backspace** (deletes the last character)
 
-Qualquer outra tecla é ignorada.
+Any other key is ignored.
 
-## Simulação
+## Simulation
 
-O testbench `tb_teclado.vhd`:
+The testbench `tb_teclado.vhd`:
 
-1. Aplica reset e aguarda 16 ms (inicialização do LCD);
-2. Envia a tecla **A** (`1C`);
-3. Envia a tecla **B** (`32`);
-4. Envia a liberação de **B** (`F0`, `32`).
+1. Applies reset and waits 16 ms (LCD initialization);
+2. Sends key **A** (`1C`);
+3. Sends key **B** (`32`);
+4. Sends the release of **B** (`F0`, `32`).
 
-Cada quadro PS/2 usa um clock de 80 µs por bit, com paridade ímpar. Para simular no ModelSim:
+Each PS/2 frame uses an 80 µs bit period with odd parity. To simulate in ModelSim:
 
 ```
 vcom teclado_morse_lcd.vhd
@@ -67,13 +67,13 @@ vsim work.tb_teclado
 run 30 ms
 ```
 
-Observe `lcd_rs`, `lcd_e` e `lcd_data` para acompanhar os comandos de inicialização e os caracteres enviados às duas linhas.
+Watch `lcd_rs`, `lcd_e` and `lcd_data` to follow the initialization commands and the characters sent to both lines.
 
-## Pontos de atenção
+## Things to be aware of
 
-Observações sobre o código atual, úteis antes de testar na placa:
+Observations about the current code that are worth knowing before testing on the board:
 
-- **Tempo do LCD:** com `clk_cnt = 5`, o `lcd_tick` ocorre a cada 6 ciclos de clock (~120 ns). Isso é adequado para simulação, mas um LCD real normalmente exige tempos bem maiores entre comandos (dezenas de µs a alguns ms) e esperas na inicialização. Para hardware, é preciso aumentar esse valor e/ou incluir atrasos.
-- **Tamanho do buffer Morse:** o buffer tem 16 posições, mas 5 caracteres podem ocupar até 25. Dependendo do texto digitado, pode haver acesso fora dos limites.
-- **Espaço:** conta como um dos 5 caracteres e ocupa 3 posições no Morse.
-- **Teclas estendidas:** códigos com prefixo `E0` não são tratados.
+- **LCD timing:** with `clk_cnt = 5`, `lcd_tick` fires every 6 clock cycles (~120 ns). This works for simulation, but a real LCD usually needs much longer delays between commands (tens of µs to a few ms) and waits during initialization. For hardware, this value must be increased and/or delays added.
+- **Morse buffer size:** the buffer has 16 positions, but 5 characters can take up to 25. Depending on the typed text, this may cause out-of-range accesses.
+- **Space:** it counts as one of the 5 characters and takes 3 positions in the Morse line.
+- **Extended keys:** codes with the `E0` prefix are not handled.
